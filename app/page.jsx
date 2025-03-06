@@ -477,28 +477,47 @@ export default function Component() {
   const [answers, setAnswers] = useState({});
   const [results, setResults] = useState(null);
   const [normalizedResults, setNormalizedResults] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Handle client-side mounting
+  // Handle client-side mounting and initialization
   useEffect(() => {
     setMounted(true);
+    // Ensure quizSections is available
+    if (typeof quizSections !== 'undefined') {
+      setIsInitialized(true);
+    }
   }, []);
 
-  // Don't render anything until mounted
-  if (!mounted) {
-    return null;
+  // Don't render anything until mounted and initialized
+  if (!mounted || !isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-xl">Loading quiz...</div>
+      </div>
+    );
   }
 
   const getCurrentSection = () => {
-    if (!currentSection || !quizSections[currentSection]) {
+    try {
+      if (!currentSection || !quizSections[currentSection]) {
+        return quizSections['qualification'];
+      }
+      return quizSections[currentSection];
+    } catch (error) {
+      console.error('Error getting current section:', error);
       return quizSections['qualification'];
     }
-    return quizSections[currentSection];
   };
 
   const getCurrentQuestion = () => {
-    const section = getCurrentSection();
-    if (!section?.questions) return null;
-    return section.questions[currentQuestionIndex];
+    try {
+      const section = getCurrentSection();
+      if (!section?.questions) return null;
+      return section.questions[currentQuestionIndex];
+    } catch (error) {
+      console.error('Error getting current question:', error);
+      return null;
+    }
   };
 
   const QuizScreen = () => {
@@ -528,6 +547,54 @@ export default function Component() {
         } else {
           setCurrentScreen("welcome");
         }
+      }
+    };
+
+    const handleAnswer = (value) => {
+      try {
+        const currentQuestion = getCurrentQuestion();
+        if (!currentQuestion) return;
+        
+        setAnswers((prev) => ({
+          ...prev,
+          [`${currentSection}-${currentQuestion.id}`]: value,
+        }));
+
+        // Automatically advance for single-choice questions
+        if (currentQuestion.type === "single") {
+          setTimeout(() => {
+            moveToNextQuestion();
+          }, 0);
+        }
+      } catch (error) {
+        console.error('Error handling answer:', error);
+      }
+    };
+
+    const moveToNextQuestion = () => {
+      try {
+        const currentQuestion = getCurrentQuestion();
+        if (!currentQuestion) return;
+
+        const currentSectionData = getCurrentSection();
+        if (!currentSectionData?.questions) return;
+        
+        const currentSectionQuestions = currentSectionData.questions;
+        
+        if (currentQuestionIndex < currentSectionQuestions.length - 1) {
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+        } else {
+          const sectionKeys = Object.keys(quizSections);
+          const currentSectionIndex = sectionKeys.indexOf(currentSection);
+          if (currentSectionIndex < sectionKeys.length - 1) {
+            setCurrentSection(sectionKeys[currentSectionIndex + 1]);
+            setCurrentQuestionIndex(0);
+          } else {
+            calculateResults();
+          }
+        }
+      } catch (error) {
+        console.error('Error moving to next question:', error);
       }
     };
 
@@ -676,44 +743,6 @@ export default function Component() {
   const startQuiz = () => {
     setCurrentScreen("quiz")
   }
-
-  const handleAnswer = (value) => {
-    const currentQuestion = getCurrentQuestion();
-    if (!currentQuestion) return;
-    
-    setAnswers((prev) => ({
-      ...prev,
-      [`${currentSection}-${currentQuestion.id}`]: value,
-    }));
-
-    // Automatically advance for single-choice questions
-    if (currentQuestion.type === "single") {
-      setTimeout(() => {
-        moveToNextQuestion();
-      }, 0);
-    }
-  };
-
-  const moveToNextQuestion = () => {
-    const currentQuestion = getCurrentQuestion();
-    if (!currentQuestion) return;
-
-    const currentSectionData = getCurrentSection();
-    const currentSectionQuestions = currentSectionData.questions;
-    
-    if (currentQuestionIndex < currentSectionQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      const sectionKeys = Object.keys(quizSections);
-      const currentSectionIndex = sectionKeys.indexOf(currentSection);
-      if (currentSectionIndex < sectionKeys.length - 1) {
-        setCurrentSection(sectionKeys[currentSectionIndex + 1]);
-        setCurrentQuestionIndex(0);
-      } else {
-        calculateResults();
-      }
-    }
-  };
 
   const calculateResults = () => {
     const results = {
