@@ -478,13 +478,22 @@ export default function Component() {
   const [results, setResults] = useState(null);
   const [normalizedResults, setNormalizedResults] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState(null);
 
   // Handle client-side mounting and initialization
   useEffect(() => {
-    setMounted(true);
-    // Ensure quizSections is available
-    if (typeof quizSections !== 'undefined') {
-      setIsInitialized(true);
+    try {
+      setMounted(true);
+      // Ensure quizSections is available and has the expected structure
+      if (typeof quizSections !== 'undefined' && Object.keys(quizSections).length > 0) {
+        setIsInitialized(true);
+      } else {
+        setError('Quiz data not properly initialized');
+        console.error('Quiz sections data is not available:', quizSections);
+      }
+    } catch (err) {
+      setError('Error initializing quiz');
+      console.error('Error during initialization:', err);
     }
   }, []);
 
@@ -492,7 +501,21 @@ export default function Component() {
   if (!mounted || !isInitialized) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-xl">Loading quiz...</div>
+        <div className="text-xl">
+          {error ? (
+            <div className="text-red-600">
+              {error}
+              <button 
+                onClick={() => window.location.reload()} 
+                className="ml-4 text-blue-600 hover:text-blue-800"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            'Loading quiz...'
+          )}
+        </div>
       </div>
     );
   }
@@ -500,6 +523,7 @@ export default function Component() {
   const getCurrentSection = () => {
     try {
       if (!currentSection || !quizSections[currentSection]) {
+        console.warn('Invalid section:', currentSection);
         return quizSections['qualification'];
       }
       return quizSections[currentSection];
@@ -512,7 +536,14 @@ export default function Component() {
   const getCurrentQuestion = () => {
     try {
       const section = getCurrentSection();
-      if (!section?.questions) return null;
+      if (!section?.questions) {
+        console.error('Section questions not found:', section);
+        return null;
+      }
+      if (currentQuestionIndex >= section.questions.length) {
+        console.warn('Question index out of bounds:', currentQuestionIndex);
+        return null;
+      }
       return section.questions[currentQuestionIndex];
     } catch (error) {
       console.error('Error getting current question:', error);
@@ -521,96 +552,139 @@ export default function Component() {
   };
 
   const QuizScreen = () => {
-    const currentSectionData = getCurrentSection();
-    const currentQuestion = getCurrentQuestion();
+    try {
+      const currentSectionData = getCurrentSection();
+      const currentQuestion = getCurrentQuestion();
 
-    if (!currentSectionData || !currentQuestion) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
-          <div className="text-xl text-red-600">Error loading quiz. Please refresh the page.</div>
-        </div>
-      );
-    }
-
-    const SectionIcon = currentSectionData.icon;
-
-    const goBack = () => {
-      if (currentQuestionIndex > 0) {
-        setCurrentQuestionIndex(currentQuestionIndex - 1);
-      } else {
-        const sectionKeys = Object.keys(quizSections);
-        const currentSectionIndex = sectionKeys.indexOf(currentSection);
-        if (currentSectionIndex > 0) {
-          setCurrentSection(sectionKeys[currentSectionIndex - 1]);
-          const prevSectionData = quizSections[sectionKeys[currentSectionIndex - 1]];
-          setCurrentQuestionIndex(prevSectionData.questions.length - 1);
-        } else {
-          setCurrentScreen("welcome");
-        }
+      if (!currentSectionData || !currentQuestion) {
+        console.error('Missing quiz data:', { currentSectionData, currentQuestion });
+        return (
+          <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+            <div className="text-xl text-red-600">
+              Error loading quiz. Please refresh the page.
+              <button 
+                onClick={() => window.location.reload()} 
+                className="ml-4 text-blue-600 hover:text-blue-800"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        );
       }
-    };
 
-    const handleAnswer = (value) => {
-      try {
-        const currentQuestion = getCurrentQuestion();
-        if (!currentQuestion) return;
-        
-        setAnswers((prev) => ({
-          ...prev,
-          [`${currentSection}-${currentQuestion.id}`]: value,
-        }));
+      const SectionIcon = currentSectionData.icon;
 
-        // Automatically advance for single-choice questions
-        if (currentQuestion.type === "single") {
-          setTimeout(() => {
-            moveToNextQuestion();
-          }, 0);
-        }
-      } catch (error) {
-        console.error('Error handling answer:', error);
-      }
-    };
-
-    const moveToNextQuestion = () => {
-      try {
-        const currentQuestion = getCurrentQuestion();
-        if (!currentQuestion) return;
-
-        const currentSectionData = getCurrentSection();
-        if (!currentSectionData?.questions) return;
-        
-        const currentSectionQuestions = currentSectionData.questions;
-        
-        if (currentQuestionIndex < currentSectionQuestions.length - 1) {
-          setCurrentQuestionIndex(currentQuestionIndex + 1);
+      const goBack = () => {
+        if (currentQuestionIndex > 0) {
+          setCurrentQuestionIndex(currentQuestionIndex - 1);
         } else {
           const sectionKeys = Object.keys(quizSections);
           const currentSectionIndex = sectionKeys.indexOf(currentSection);
-          if (currentSectionIndex < sectionKeys.length - 1) {
-            setCurrentSection(sectionKeys[currentSectionIndex + 1]);
-            setCurrentQuestionIndex(0);
+          if (currentSectionIndex > 0) {
+            setCurrentSection(sectionKeys[currentSectionIndex - 1]);
+            const prevSectionData = quizSections[sectionKeys[currentSectionIndex - 1]];
+            setCurrentQuestionIndex(prevSectionData.questions.length - 1);
           } else {
-            calculateResults();
+            setCurrentScreen("welcome");
           }
         }
-      } catch (error) {
-        console.error('Error moving to next question:', error);
-      }
-    };
+      };
 
-    const renderQuestion = (question) => {
-      switch (question.type) {
-        case "single":
-          return (
-            <div className="space-y-4">
-              <RadioGroup
-                value={answers[`${currentSection}-${question.id}`]}
-                onChange={(value) => handleAnswer(value)}
-                className="grid gap-4"
-              >
+      const handleAnswer = (value) => {
+        try {
+          const currentQuestion = getCurrentQuestion();
+          if (!currentQuestion) return;
+          
+          setAnswers((prev) => ({
+            ...prev,
+            [`${currentSection}-${currentQuestion.id}`]: value,
+          }));
+
+          // Automatically advance for single-choice questions
+          if (currentQuestion.type === "single") {
+            setTimeout(() => {
+              moveToNextQuestion();
+            }, 0);
+          }
+        } catch (error) {
+          console.error('Error handling answer:', error);
+        }
+      };
+
+      const moveToNextQuestion = () => {
+        try {
+          const currentQuestion = getCurrentQuestion();
+          if (!currentQuestion) return;
+
+          const currentSectionData = getCurrentSection();
+          if (!currentSectionData?.questions) return;
+          
+          const currentSectionQuestions = currentSectionData.questions;
+          
+          if (currentQuestionIndex < currentSectionQuestions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+          } else {
+            const sectionKeys = Object.keys(quizSections);
+            const currentSectionIndex = sectionKeys.indexOf(currentSection);
+            if (currentSectionIndex < sectionKeys.length - 1) {
+              setCurrentSection(sectionKeys[currentSectionIndex + 1]);
+              setCurrentQuestionIndex(0);
+            } else {
+              calculateResults();
+            }
+          }
+        } catch (error) {
+          console.error('Error moving to next question:', error);
+        }
+      };
+
+      const renderQuestion = (question) => {
+        switch (question.type) {
+          case "single":
+            return (
+              <div className="space-y-4">
+                <RadioGroup
+                  value={answers[`${currentSection}-${question.id}`]}
+                  onChange={(value) => handleAnswer(value)}
+                  className="grid gap-4"
+                >
+                  {question.options.map((option) => (
+                    <div key={option.value} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option.value} id={option.value} />
+                      <Label
+                        htmlFor={option.value}
+                        className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                      >
+                        {option.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+                <Button 
+                  onClick={goBack}
+                  className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Back
+                </Button>
+              </div>
+            )
+          case "multiple":
+            return (
+              <div className="grid gap-4">
                 {question.options.map((option) => (
                   <div key={option.value} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.value} id={option.value} />
+                    <Checkbox
+                      id={option.value}
+                      checked={answers[`${currentSection}-${question.id}`]?.includes(option.value)}
+                      onChange={(e) => {
+                        const currentAnswers = answers[`${currentSection}-${question.id}`] || []
+                        const updatedAnswers = e.target.checked
+                          ? [...currentAnswers, option.value]
+                          : currentAnswers.filter((value) => value !== option.value)
+                        handleAnswer(updatedAnswers)
+                      }}
+                    />
                     <Label
                       htmlFor={option.value}
                       className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -619,125 +693,100 @@ export default function Component() {
                     </Label>
                   </div>
                 ))}
-              </RadioGroup>
-              <Button 
-                onClick={goBack}
-                className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-              >
-                Back
-              </Button>
-            </div>
-          )
-        case "multiple":
-          return (
-            <div className="grid gap-4">
-              {question.options.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={option.value}
-                    checked={answers[`${currentSection}-${question.id}`]?.includes(option.value)}
-                    onChange={(e) => {
-                      const currentAnswers = answers[`${currentSection}-${question.id}`] || []
-                      const updatedAnswers = e.target.checked
-                        ? [...currentAnswers, option.value]
-                        : currentAnswers.filter((value) => value !== option.value)
-                      handleAnswer(updatedAnswers)
-                    }}
-                  />
-                  <Label
-                    htmlFor={option.value}
-                    className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                <div className="flex gap-4 mt-4">
+                  <Button 
+                    onClick={goBack}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                   >
-                    {option.label}
-                  </Label>
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={moveToNextQuestion} 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  >
+                    Next
+                  </Button>
                 </div>
-              ))}
-              <div className="flex gap-4 mt-4">
-                <Button 
-                  onClick={goBack}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Back
-                </Button>
-                <Button 
-                  onClick={moveToNextQuestion} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Next
-                </Button>
               </div>
-            </div>
-          )
-        case "grid":
-          return (
-            <div className="space-y-4">
-              {question.subQuestions.map((subQuestion, index) => (
-                <div key={index} className="space-y-2">
-                  <Label>{subQuestion}</Label>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <span key={value}>{value}</span>
-                    ))}
+            )
+          case "grid":
+            return (
+              <div className="space-y-4">
+                {question.subQuestions.map((subQuestion, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label>{subQuestion}</Label>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <span key={value}>{value}</span>
+                      ))}
+                    </div>
+                    <div className="flex justify-between">
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <div key={value} className="flex flex-col items-center">
+                          <input
+                            type="radio"
+                            id={`${subQuestion}-${value}`}
+                            name={`${currentSection}-${question.id}-${index}`}
+                            value={value}
+                            checked={answers[`${currentSection}-${question.id}`]?.[index] === value || (answers[`${currentSection}-${question.id}`]?.[index] === undefined && value === 3)}
+                            onChange={() => {
+                              const currentAnswers = answers[`${currentSection}-${question.id}`] || {}
+                              handleAnswer({ ...currentAnswers, [index]: value })
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <div key={value} className="flex flex-col items-center">
-                        <input
-                          type="radio"
-                          id={`${subQuestion}-${value}`}
-                          name={`${currentSection}-${question.id}-${index}`}
-                          value={value}
-                          checked={answers[`${currentSection}-${question.id}`]?.[index] === value || (answers[`${currentSection}-${question.id}`]?.[index] === undefined && value === 3)}
-                          onChange={() => {
-                            const currentAnswers = answers[`${currentSection}-${question.id}`] || {}
-                            handleAnswer({ ...currentAnswers, [index]: value })
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                ))}
+                <div className="flex gap-4 mt-4">
+                  <Button 
+                    onClick={goBack}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={moveToNextQuestion} 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  >
+                    Next
+                  </Button>
                 </div>
-              ))}
-              <div className="flex gap-4 mt-4">
-                <Button 
-                  onClick={goBack}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Back
-                </Button>
-                <Button 
-                  onClick={moveToNextQuestion} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Next
-                </Button>
               </div>
-            </div>
-          )
-        default:
-          return null
+            )
+          default:
+            return null
+        }
       }
-    }
 
-    return (
-      <Card className="w-full max-w-2xl mx-auto">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            {SectionIcon && <SectionIcon className="w-4 h-4" />}
-            <span>{currentSectionData.title}</span>
-            <ChevronRight className="w-4 h-4" />
-            <span>Question {getContinuousQuestionNumber()} of 18</span>
-          </div>
-          <Progress value={calculateProgress()} className="mb-4 h-2 bg-gray-200 rounded-full">
-            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${calculateProgress()}%` }}></div>
-          </Progress>
-          <CardTitle className="text-xl">{currentQuestion.question}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderQuestion(currentQuestion)}
-        </CardContent>
-      </Card>
-    )
+      return (
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              {SectionIcon && <SectionIcon className="w-4 h-4" />}
+              <span>{currentSectionData.title}</span>
+              <ChevronRight className="w-4 h-4" />
+              <span>Question {getContinuousQuestionNumber()} of 18</span>
+            </div>
+            <Progress value={calculateProgress()} className="mb-4 h-2 bg-gray-200 rounded-full">
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${calculateProgress()}%` }}></div>
+            </Progress>
+            <CardTitle className="text-xl">{currentQuestion.question}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {renderQuestion(currentQuestion)}
+          </CardContent>
+        </Card>
+      )
+    } catch (error) {
+      console.error('Error rendering quiz screen:', error);
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+          <div className="text-xl text-red-600">Error loading quiz. Please refresh the page.</div>
+        </div>
+      );
+    }
   }
 
   const startQuiz = () => {
