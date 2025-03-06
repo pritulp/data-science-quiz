@@ -471,7 +471,7 @@ const roleDefinitions = {
 
 export default function Component() {
   const [currentScreen, setCurrentScreen] = useState('welcome');
-  const [currentSection, setCurrentSection] = useState('qualification');
+  const [currentSection, setCurrentSection] = useState('technical');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [results, setResults] = useState(null);
@@ -690,13 +690,6 @@ export default function Component() {
     return questionNumber;
   }
 
-  const getCurrentSection = () => {
-    if (!currentSection || !quizSections[currentSection]) {
-      return quizSections['qualification']; // Default to first section if current is invalid
-    }
-    return quizSections[currentSection];
-  };
-
   const WelcomeScreen = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4">
@@ -718,17 +711,8 @@ export default function Component() {
   };
 
   const QuizScreen = () => {
-    const currentSectionData = getCurrentSection();
-    if (!currentSectionData || !currentSectionData.questions) {
-      return <div>Error loading quiz section. Please try refreshing the page.</div>;
-    }
-    
-    const currentQuestion = currentSectionData.questions[currentQuestionIndex];
-    if (!currentQuestion) {
-      return <div>Error loading question. Please try refreshing the page.</div>;
-    }
-    
-    const SectionIcon = currentSectionData.icon;
+    const currentQuestion = quizSections[currentSection].questions[currentQuestionIndex]
+    const SectionIcon = quizSections[currentSection].icon
 
     const goBack = () => {
       if (currentQuestionIndex > 0) {
@@ -871,7 +855,7 @@ export default function Component() {
         <CardHeader>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             {SectionIcon && <SectionIcon className="w-4 h-4" />}
-            <span>{currentSectionData.title}</span>
+            <span>{quizSections[currentSection].title}</span>
             <ChevronRight className="w-4 h-4" />
             <span>Question {getContinuousQuestionNumber()} of 18</span>
           </div>
