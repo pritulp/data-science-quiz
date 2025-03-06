@@ -470,17 +470,12 @@ const roleDefinitions = {
 }
 
 export default function Component() {
-  const [currentScreen, setCurrentScreen] = useState('welcome');
-  const [currentSection, setCurrentSection] = useState('technical');
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [results, setResults] = useState(null);
-  const [normalizedResults, setNormalizedResults] = useState(null);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const [currentStep, setCurrentStep] = useState("welcome")
+  const [currentSection, setCurrentSection] = useState("qualification")
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState({})
+  const [results, setResults] = useState(null)
+  const [normalizedResults, setNormalizedResults] = useState(null)
 
   useEffect(() => {
     if (results && Object.keys(results).length > 0) {
@@ -496,7 +491,7 @@ export default function Component() {
   }, [results])
 
   const startQuiz = () => {
-    setCurrentScreen("quiz")
+    setCurrentStep("quiz")
   }
 
   const handleAnswer = (value) => {
@@ -636,7 +631,7 @@ export default function Component() {
 
     setResults(filteredResults)
     setNormalizedResults(filteredResults)
-    setCurrentScreen("results")
+    setCurrentStep("results")
   }
 
   const calculateProgress = () => {
@@ -692,23 +687,69 @@ export default function Component() {
 
   const WelcomeScreen = () => {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">Data Science Quiz</h1>
-          <p className="text-lg text-gray-600 mb-8">
-            Test your knowledge of data science concepts, tools, and best practices.
-            This quiz covers technical skills, soft skills, and industry knowledge.
-          </p>
-          <button
-            onClick={() => setCurrentScreen('quiz')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
-          >
-            Start Quiz
-          </button>
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-3xl mx-auto text-center">
+          <Card className="mb-8">
+            <CardHeader>
+              <img
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/data_science_roles_career_path.jpg-mGDNfUemzGSmP821vGuVSBbwgPtJ2E.jpeg"
+                alt="Data Science Career Paths"
+                className="w-full h-auto mb-6 rounded-lg"
+              />
+              <CardTitle className="text-4xl font-bold text-primary mb-6">
+                Find Your Perfect Data Science Path
+              </CardTitle>
+              <CardDescription className="text-xl text-muted-foreground mb-8">
+                Discover which data science role matches your skills, interests, and working style
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <Card>
+                  <CardHeader>
+                    <Database className="w-8 h-8 text-primary mb-2" />
+                    <CardTitle>10+ Roles Analyzed</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>From Data Engineering to ML Research</CardDescription>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <Brain className="w-8 h-8 text-primary mb-2" />
+                    <CardTitle>Comprehensive Assessment</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>Skills, interests & working style</CardDescription>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <BarChart className="w-8 h-8 text-primary mb-2" />
+                    <CardTitle>Detailed Results</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription>Get personalized career insights</CardDescription>
+                  </CardContent>
+                </Card>
+              </div>
+              <Button
+                onClick={startQuiz}
+                className="inline-flex items-center px-6 py-3 text-lg font-medium bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Start Your Journey
+                <ChevronRight className="ml-2 w-5 h-5" />
+              </Button>
+            </CardContent>
+          </Card>
+          <div className="mt-8 text-muted-foreground">
+            <p className="mb-4">✨ Takes about 15 minutes to complete</p>
+            <p>🎯 Get personalized role recommendations</p>
+          </div>
         </div>
       </div>
-    );
-  };
+    )
+  }
 
   const QuizScreen = () => {
     const currentQuestion = quizSections[currentSection].questions[currentQuestionIndex]
@@ -724,7 +765,7 @@ export default function Component() {
           setCurrentSection(sectionKeys[currentSectionIndex - 1])
           setCurrentQuestionIndex(quizSections[sectionKeys[currentSectionIndex - 1]].questions.length - 1)
         } else {
-          setCurrentScreen("welcome")
+          setCurrentStep("welcome")
         }
       }
     }
@@ -893,7 +934,7 @@ export default function Component() {
           </div>
           <div className="flex gap-4 mt-8">
             <Button 
-              onClick={() => setCurrentScreen("quiz")}
+              onClick={() => setCurrentStep("quiz")}
               variant="outline"
               className="flex-1 bg-white text-blue-600 hover:bg-gray-100"
             >
@@ -912,15 +953,11 @@ export default function Component() {
     )
   }
 
-  if (!isClient) {
-    return null; // or a loading spinner
-  }
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      {currentScreen === 'welcome' && <WelcomeScreen />}
-      {currentScreen === 'quiz' && <QuizScreen />}
-      {currentScreen === 'results' && <ResultsScreen />}
-    </main>
-  );
+    <div className="container mx-auto px-4 py-12">
+      {currentStep === "welcome" && <WelcomeScreen />}
+      {currentStep === "quiz" && <QuizScreen />}
+      {currentStep === "results" && <ResultsScreen />}
+    </div>
+  )
 }
