@@ -470,36 +470,208 @@ const roleDefinitions = {
 }
 
 export default function Component() {
+  const [mounted, setMounted] = useState(false);
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [currentSection, setCurrentSection] = useState('qualification');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [results, setResults] = useState(null);
   const [normalizedResults, setNormalizedResults] = useState(null);
-  const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
+  // Handle client-side mounting
   useEffect(() => {
-    setIsClient(true);
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-    return () => clearTimeout(timer);
+    setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (results && Object.keys(results).length > 0) {
-      const maxScore = Math.max(...Object.values(results))
-      const normalized = {}
+  // Don't render anything until mounted
+  if (!mounted) {
+    return null;
+  }
 
-      for (let role in results) {
-        normalized[role] = Math.round((results[role] / maxScore) * 100)
-      }
-
-      setNormalizedResults(normalized)
+  const getCurrentSection = () => {
+    if (!currentSection || !quizSections[currentSection]) {
+      return quizSections['qualification'];
     }
-  }, [results])
+    return quizSections[currentSection];
+  };
+
+  const getCurrentQuestion = () => {
+    const section = getCurrentSection();
+    if (!section?.questions) return null;
+    return section.questions[currentQuestionIndex];
+  };
+
+  const QuizScreen = () => {
+    const currentSectionData = getCurrentSection();
+    const currentQuestion = getCurrentQuestion();
+
+    if (!currentSectionData || !currentQuestion) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+          <div className="text-xl text-red-600">Error loading quiz. Please refresh the page.</div>
+        </div>
+      );
+    }
+
+    const SectionIcon = currentSectionData.icon;
+
+    const goBack = () => {
+      if (currentQuestionIndex > 0) {
+        setCurrentQuestionIndex(currentQuestionIndex - 1);
+      } else {
+        const sectionKeys = Object.keys(quizSections);
+        const currentSectionIndex = sectionKeys.indexOf(currentSection);
+        if (currentSectionIndex > 0) {
+          setCurrentSection(sectionKeys[currentSectionIndex - 1]);
+          const prevSectionData = quizSections[sectionKeys[currentSectionIndex - 1]];
+          setCurrentQuestionIndex(prevSectionData.questions.length - 1);
+        } else {
+          setCurrentScreen("welcome");
+        }
+      }
+    };
+
+    const renderQuestion = (question) => {
+      switch (question.type) {
+        case "single":
+          return (
+            <div className="space-y-4">
+              <RadioGroup
+                value={answers[`${currentSection}-${question.id}`]}
+                onChange={(value) => handleAnswer(value)}
+                className="grid gap-4"
+              >
+                {question.options.map((option) => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={option.value} id={option.value} />
+                    <Label
+                      htmlFor={option.value}
+                      className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                    >
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+              <Button 
+                onClick={goBack}
+                className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              >
+                Back
+              </Button>
+            </div>
+          )
+        case "multiple":
+          return (
+            <div className="grid gap-4">
+              {question.options.map((option) => (
+                <div key={option.value} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={option.value}
+                    checked={answers[`${currentSection}-${question.id}`]?.includes(option.value)}
+                    onChange={(e) => {
+                      const currentAnswers = answers[`${currentSection}-${question.id}`] || []
+                      const updatedAnswers = e.target.checked
+                        ? [...currentAnswers, option.value]
+                        : currentAnswers.filter((value) => value !== option.value)
+                      handleAnswer(updatedAnswers)
+                    }}
+                  />
+                  <Label
+                    htmlFor={option.value}
+                    className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                  >
+                    {option.label}
+                  </Label>
+                </div>
+              ))}
+              <div className="flex gap-4 mt-4">
+                <Button 
+                  onClick={goBack}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Back
+                </Button>
+                <Button 
+                  onClick={moveToNextQuestion} 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )
+        case "grid":
+          return (
+            <div className="space-y-4">
+              {question.subQuestions.map((subQuestion, index) => (
+                <div key={index} className="space-y-2">
+                  <Label>{subQuestion}</Label>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <span key={value}>{value}</span>
+                    ))}
+                  </div>
+                  <div className="flex justify-between">
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <div key={value} className="flex flex-col items-center">
+                        <input
+                          type="radio"
+                          id={`${subQuestion}-${value}`}
+                          name={`${currentSection}-${question.id}-${index}`}
+                          value={value}
+                          checked={answers[`${currentSection}-${question.id}`]?.[index] === value || (answers[`${currentSection}-${question.id}`]?.[index] === undefined && value === 3)}
+                          onChange={() => {
+                            const currentAnswers = answers[`${currentSection}-${question.id}`] || {}
+                            handleAnswer({ ...currentAnswers, [index]: value })
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-4 mt-4">
+                <Button 
+                  onClick={goBack}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Back
+                </Button>
+                <Button 
+                  onClick={moveToNextQuestion} 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )
+        default:
+          return null
+      }
+    }
+
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+            {SectionIcon && <SectionIcon className="w-4 h-4" />}
+            <span>{currentSectionData.title}</span>
+            <ChevronRight className="w-4 h-4" />
+            <span>Question {getContinuousQuestionNumber()} of 18</span>
+          </div>
+          <Progress value={calculateProgress()} className="mb-4 h-2 bg-gray-200 rounded-full">
+            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${calculateProgress()}%` }}></div>
+          </Progress>
+          <CardTitle className="text-xl">{currentQuestion.question}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {renderQuestion(currentQuestion)}
+        </CardContent>
+      </Card>
+    )
+  }
 
   const startQuiz = () => {
     setCurrentScreen("quiz")
@@ -706,19 +878,6 @@ export default function Component() {
     return questionNumber;
   }
 
-  const getCurrentSection = () => {
-    if (!currentSection || !quizSections[currentSection]) {
-      return quizSections['qualification'];
-    }
-    return quizSections[currentSection];
-  };
-
-  const getCurrentQuestion = () => {
-    const section = getCurrentSection();
-    if (!section?.questions) return null;
-    return section.questions[currentQuestionIndex];
-  };
-
   const WelcomeScreen = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4">
@@ -738,186 +897,6 @@ export default function Component() {
       </div>
     );
   };
-
-  const QuizScreen = () => {
-    if (isLoading) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
-          <div className="text-xl">Loading quiz...</div>
-        </div>
-      );
-    }
-
-    const currentSectionData = getCurrentSection();
-    const currentQuestion = getCurrentQuestion();
-
-    if (!currentSectionData || !currentQuestion) {
-      return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
-          <div className="text-xl text-red-600">Error loading quiz. Please refresh the page.</div>
-        </div>
-      );
-    }
-
-    const SectionIcon = currentSectionData.icon;
-
-    const goBack = () => {
-      if (currentQuestionIndex > 0) {
-        setCurrentQuestionIndex(currentQuestionIndex - 1);
-      } else {
-        const sectionKeys = Object.keys(quizSections);
-        const currentSectionIndex = sectionKeys.indexOf(currentSection);
-        if (currentSectionIndex > 0) {
-          setCurrentSection(sectionKeys[currentSectionIndex - 1]);
-          const prevSectionData = quizSections[sectionKeys[currentSectionIndex - 1]];
-          setCurrentQuestionIndex(prevSectionData.questions.length - 1);
-        } else {
-          setCurrentScreen("welcome");
-        }
-      }
-    };
-
-    const renderQuestion = (question) => {
-      switch (question.type) {
-        case "single":
-          return (
-            <div className="space-y-4">
-              <RadioGroup
-                value={answers[`${currentSection}-${question.id}`]}
-                onChange={(value) => handleAnswer(value)}
-                className="grid gap-4"
-              >
-                {question.options.map((option) => (
-                  <div key={option.value} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.value} id={option.value} />
-                    <Label
-                      htmlFor={option.value}
-                      className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                    >
-                      {option.label}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-              <Button 
-                onClick={goBack}
-                className="w-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-              >
-                Back
-              </Button>
-            </div>
-          )
-        case "multiple":
-          return (
-            <div className="grid gap-4">
-              {question.options.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={option.value}
-                    checked={answers[`${currentSection}-${question.id}`]?.includes(option.value)}
-                    onChange={(e) => {
-                      const currentAnswers = answers[`${currentSection}-${question.id}`] || []
-                      const updatedAnswers = e.target.checked
-                        ? [...currentAnswers, option.value]
-                        : currentAnswers.filter((value) => value !== option.value)
-                      handleAnswer(updatedAnswers)
-                    }}
-                  />
-                  <Label
-                    htmlFor={option.value}
-                    className="flex flex-1 items-center justify-between rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                  >
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-              <div className="flex gap-4 mt-4">
-                <Button 
-                  onClick={goBack}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Back
-                </Button>
-                <Button 
-                  onClick={moveToNextQuestion} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )
-        case "grid":
-          return (
-            <div className="space-y-4">
-              {question.subQuestions.map((subQuestion, index) => (
-                <div key={index} className="space-y-2">
-                  <Label>{subQuestion}</Label>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <span key={value}>{value}</span>
-                    ))}
-                  </div>
-                  <div className="flex justify-between">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <div key={value} className="flex flex-col items-center">
-                        <input
-                          type="radio"
-                          id={`${subQuestion}-${value}`}
-                          name={`${currentSection}-${question.id}-${index}`}
-                          value={value}
-                          checked={answers[`${currentSection}-${question.id}`]?.[index] === value || (answers[`${currentSection}-${question.id}`]?.[index] === undefined && value === 3)}
-                          onChange={() => {
-                            const currentAnswers = answers[`${currentSection}-${question.id}`] || {}
-                            handleAnswer({ ...currentAnswers, [index]: value })
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="flex gap-4 mt-4">
-                <Button 
-                  onClick={goBack}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Back
-                </Button>
-                <Button 
-                  onClick={moveToNextQuestion} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )
-        default:
-          return null
-      }
-    }
-
-    return (
-      <Card className="w-full max-w-2xl mx-auto">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            {SectionIcon && <SectionIcon className="w-4 h-4" />}
-            <span>{currentSectionData.title}</span>
-            <ChevronRight className="w-4 h-4" />
-            <span>Question {getContinuousQuestionNumber()} of 18</span>
-          </div>
-          <Progress value={calculateProgress()} className="mb-4 h-2 bg-gray-200 rounded-full">
-            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${calculateProgress()}%` }}></div>
-          </Progress>
-          <CardTitle className="text-xl">{currentQuestion.question}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderQuestion(currentQuestion)}
-        </CardContent>
-      </Card>
-    )
-  }
 
   const ResultsScreen = () => {
     if (!normalizedResults) {
@@ -960,8 +939,8 @@ export default function Component() {
     )
   }
 
-  if (!isClient) {
-    return null; // or a loading spinner
+  if (!mounted) {
+    return null;
   }
 
   return (
