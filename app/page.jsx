@@ -477,9 +477,15 @@ export default function Component() {
   const [results, setResults] = useState(null);
   const [normalizedResults, setNormalizedResults] = useState(null);
   const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsClient(true);
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -500,8 +506,8 @@ export default function Component() {
   }
 
   const handleAnswer = (value) => {
-    const currentSectionData = getCurrentSection();
-    const currentQuestion = currentSectionData.questions[currentQuestionIndex];
+    const currentQuestion = getCurrentQuestion();
+    if (!currentQuestion) return;
     
     setAnswers((prev) => ({
       ...prev,
@@ -517,6 +523,9 @@ export default function Component() {
   };
 
   const moveToNextQuestion = () => {
+    const currentQuestion = getCurrentQuestion();
+    if (!currentQuestion) return;
+
     const currentSectionData = getCurrentSection();
     const currentSectionQuestions = currentSectionData.questions;
     
@@ -699,9 +708,15 @@ export default function Component() {
 
   const getCurrentSection = () => {
     if (!currentSection || !quizSections[currentSection]) {
-      return quizSections['qualification']; // Default to first section if current is invalid
+      return quizSections['qualification'];
     }
     return quizSections[currentSection];
+  };
+
+  const getCurrentQuestion = () => {
+    const section = getCurrentSection();
+    if (!section?.questions) return null;
+    return section.questions[currentQuestionIndex];
   };
 
   const WelcomeScreen = () => {
@@ -725,16 +740,25 @@ export default function Component() {
   };
 
   const QuizScreen = () => {
+    if (isLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+          <div className="text-xl">Loading quiz...</div>
+        </div>
+      );
+    }
+
     const currentSectionData = getCurrentSection();
-    if (!currentSectionData || !currentSectionData.questions) {
-      return <div>Error loading quiz section. Please try refreshing the page.</div>;
+    const currentQuestion = getCurrentQuestion();
+
+    if (!currentSectionData || !currentQuestion) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+          <div className="text-xl text-red-600">Error loading quiz. Please refresh the page.</div>
+        </div>
+      );
     }
-    
-    const currentQuestion = currentSectionData.questions[currentQuestionIndex];
-    if (!currentQuestion) {
-      return <div>Error loading question. Please try refreshing the page.</div>;
-    }
-    
+
     const SectionIcon = currentSectionData.icon;
 
     const goBack = () => {
