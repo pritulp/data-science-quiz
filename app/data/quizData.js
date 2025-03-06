@@ -1,3 +1,4 @@
+// Quiz data for the Data Science Path Quiz
 import { Users, Code2, LineChart, Brain, FileText, BarChart, Rocket } from "lucide-react";
 
 export const quizSections = {
