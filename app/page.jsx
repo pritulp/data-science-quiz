@@ -500,37 +500,39 @@ export default function Component() {
   }
 
   const handleAnswer = (value) => {
-    const currentQuestion = quizSections[currentSection].questions[currentQuestionIndex]
+    const currentSectionData = getCurrentSection();
+    const currentQuestion = currentSectionData.questions[currentQuestionIndex];
     
     setAnswers((prev) => ({
       ...prev,
       [`${currentSection}-${currentQuestion.id}`]: value,
-    }))
+    }));
 
     // Automatically advance for single-choice questions
     if (currentQuestion.type === "single") {
-      // Use setTimeout to ensure the state update is processed before moving to next question
       setTimeout(() => {
-        moveToNextQuestion()
-      }, 0)
+        moveToNextQuestion();
+      }, 0);
     }
-  }
+  };
 
   const moveToNextQuestion = () => {
-    const currentSectionQuestions = quizSections[currentSection].questions
+    const currentSectionData = getCurrentSection();
+    const currentSectionQuestions = currentSectionData.questions;
+    
     if (currentQuestionIndex < currentSectionQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1)
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      const sectionKeys = Object.keys(quizSections)
-      const currentSectionIndex = sectionKeys.indexOf(currentSection)
+      const sectionKeys = Object.keys(quizSections);
+      const currentSectionIndex = sectionKeys.indexOf(currentSection);
       if (currentSectionIndex < sectionKeys.length - 1) {
-        setCurrentSection(sectionKeys[currentSectionIndex + 1])
-        setCurrentQuestionIndex(0)
+        setCurrentSection(sectionKeys[currentSectionIndex + 1]);
+        setCurrentQuestionIndex(0);
       } else {
-        calculateResults()
+        calculateResults();
       }
     }
-  }
+  };
 
   const calculateResults = () => {
     const results = {
@@ -640,17 +642,22 @@ export default function Component() {
   }
 
   const calculateProgress = () => {
-    const totalQuestions = Object.values(quizSections).reduce((acc, section) => acc + section.questions.length, 0)
+    const totalQuestions = Object.values(quizSections).reduce((acc, section) => acc + section.questions.length, 0);
     const completedQuestions = Object.keys(answers).filter(key => {
-      const [section, questionId] = key.split('-')
-      const question = quizSections[section].questions.find(q => q.id === questionId)
+      const [section, questionId] = key.split('-');
+      const sectionData = quizSections[section];
+      if (!sectionData) return false;
+      
+      const question = sectionData.questions.find(q => q.id === questionId);
+      if (!question) return false;
+      
       if (question.type === 'multiple') {
-        return answers[key].length > 0
+        return answers[key].length > 0;
       }
-      return answers[key] !== undefined
-    }).length
-    return (completedQuestions / totalQuestions) * 100
-  }
+      return answers[key] !== undefined;
+    }).length;
+    return (completedQuestions / totalQuestions) * 100;
+  };
 
   const downloadPDF = () => {
     const doc = new jsPDF();
@@ -732,18 +739,19 @@ export default function Component() {
 
     const goBack = () => {
       if (currentQuestionIndex > 0) {
-        setCurrentQuestionIndex(currentQuestionIndex - 1)
+        setCurrentQuestionIndex(currentQuestionIndex - 1);
       } else {
-        const sectionKeys = Object.keys(quizSections)
-        const currentSectionIndex = sectionKeys.indexOf(currentSection)
+        const sectionKeys = Object.keys(quizSections);
+        const currentSectionIndex = sectionKeys.indexOf(currentSection);
         if (currentSectionIndex > 0) {
-          setCurrentSection(sectionKeys[currentSectionIndex - 1])
-          setCurrentQuestionIndex(quizSections[sectionKeys[currentSectionIndex - 1]].questions.length - 1)
+          setCurrentSection(sectionKeys[currentSectionIndex - 1]);
+          const prevSectionData = quizSections[sectionKeys[currentSectionIndex - 1]];
+          setCurrentQuestionIndex(prevSectionData.questions.length - 1);
         } else {
-          setCurrentScreen("welcome")
+          setCurrentScreen("welcome");
         }
       }
-    }
+    };
 
     const renderQuestion = (question) => {
       switch (question.type) {
